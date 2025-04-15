@@ -16,6 +16,8 @@ set(SDLIMAGE_AVIF OFF CACHE BOOL "" FORCE)
 add_subdirectory(thirdparty/SDL_image-release-3.2.4)
 #set(SDLTTF_VENDORED ON)
 add_subdirectory(thirdparty/SDL_ttf-release-3.2.2)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+add_subdirectory(thirdparty/glm-1.0.1)
 
 file(GLOB_RECURSE MY_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
@@ -43,4 +45,4 @@ target_sources("${CMAKE_PROJECT_NAME}" PRIVATE ${MY_SOURCES} )
 
 target_include_directories("${CMAKE_PROJECT_NAME}" PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include/")
 
-target_link_libraries("${CMAKE_PROJECT_NAME}" PRIVATE SDL3_image::SDL3_image SDL3_ttf::SDL3_ttf SDL3::SDL3)
+target_link_libraries("${CMAKE_PROJECT_NAME}" PRIVATE glm::glm SDL3_image::SDL3_image SDL3_ttf::SDL3_ttf SDL3::SDL3)

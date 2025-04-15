@@ -1,6 +1,7 @@
 #include "Game.h"
 
-Game::Game(): mWindow(nullptr), mRenderer(nullptr), mIsRunning(true), mTicksCount(0) {}
+Game::Game(): mWindow(nullptr), mRenderer(nullptr), mIsRunning(true),
+mTicksCount(0), mActiveActors(), mPendingActors(), mUpdatingActors(false) {}
 
 bool Game::Init()
 {
@@ -58,19 +59,14 @@ void Game::ProcessInput()
 }
 
 void Game::UpdateGame() {
-    // Frame Limiting each frame will last 16ms
-    while (!SDL_GetTicks() >= SDL_GetTicks() + 16);
-
-    // Delta Time in seconds
-    float deltaTime = (SDL_GetTicks() - mTicksCount) / 1000.0f;
-
-    // Clamp maximum Delta time
-    if (deltaTime > 0.05f)
-    {
-        deltaTime = 0.05f;
-    }
+    LimitFrames(16);
+    deltaTime = GetDeltaTime();
+    ClampDeltaTime(0.05f);
     // Update Tick count for next Frame
     mTicksCount = SDL_GetTicks();
+
+    UpdateActors();
+
 }
 
 void Game::GenerateOutput()
@@ -79,6 +75,111 @@ void Game::GenerateOutput()
     SDL_RenderClear(mRenderer);
     SDL_RenderPresent(mRenderer);
 }
+
+void Game::AddActor(Actor *actor)
+{
+    // Check if actors are updating
+    if (mUpdatingActors)
+    {
+        mPendingActors.emplace_back(actor);
+    } else
+    {
+        mActiveActors.emplace_back(actor);
+    }
+}
+
+void Game::RemoveActor(Actor *actor)
+{
+    auto iter = std::find(mPendingActors.begin(), mPendingActors.end(), actor);
+    if (iter != mPendingActors.end())
+    {
+        // Swap to end of vector and pop off (avoid erase copies)
+        std::iter_swap(iter, mPendingActors.end() - 1);
+        mPendingActors.pop_back();
+    }
+
+    iter = std::find(mActiveActors.begin(), mActiveActors.end(), actor);
+    if (iter != mActiveActors.end())
+    {
+        // Swap to end of vector and pop off (avoid erase copies)
+        std::iter_swap(iter, mActiveActors.end() - 1);
+        mActiveActors.pop_back();
+    }
+}
+
+void Game::UpdateActors()
+{
+    // Update Actors
+    mUpdatingActors = true;
+    for (auto actor : mActiveActors)
+    {
+        actor->Update(deltaTime);
+    }
+    mUpdatingActors = false;
+
+    // Move Pending Actors to Active Actors
+    for (auto actor : mPendingActors)
+    {
+        mActiveActors.emplace_back(actor);
+    }
+    mPendingActors.clear();
+
+    // Add and dead Actors to a temp vector
+    std::vector<Actor*> deadActors;
+    for (auto actor : mActiveActors)
+    {
+        if (actor->GetState() == Actor::EDead)
+        {
+            deadActors.emplace_back(actor);
+        }
+    }
+    // Delete Dead Actors
+    for (auto actor : deadActors)
+    {
+        delete actor;
+    }
+}
+
+void Game::UnloadData()
+{
+    // Delete actors
+    // Because ~Actor calls RemoveActor, have to use a different style loop
+    while (!mActiveActors.empty())
+    {
+        delete mActiveActors.back();
+    }
+
+    // Destroy textures
+    for (auto i : mTextures)
+    {
+        SDL_DestroyTexture(i.second);
+    }
+    mTextures.clear();
+}
+
+float Game::GetDeltaTime()
+{
+    // Delta Time in seconds
+    float dt = (SDL_GetTicks() - mTicksCount) / 1000.0f;
+
+    return deltaTime;
+}
+
+void Game::LimitFrames(int durationMs)
+{
+    // Frame Limiting each frame will last 16ms
+    while (!SDL_GetTicks() >= SDL_GetTicks() + durationMs);
+}
+
+void Game::ClampDeltaTime(float maxAmount)
+{
+    // Clamp maximum Delta time
+    if (deltaTime > maxAmount)
+    {
+        deltaTime = maxAmount;
+    }
+}
+
 void Game::Shutdown()
 {
     SDL_DestroyRenderer(mRenderer);
